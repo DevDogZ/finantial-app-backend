@@ -51,3 +51,39 @@ def deletar_categoria(categoria_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"detail": "Categoria deletada"}
 
+
+@app.post("/contas", response_model = schemas.ContaResponse)
+def criar_conta(conta: schemas.ContaCreate, db: Session = Depends(get_db)):
+    nova_conta = models.Conta(**conta.model_dump())
+    db.add(nova_conta)
+    db.commit()
+    db.refresh(nova_conta)
+    return nova_conta
+
+
+@app.get("/contas", response_model=list[schemas.ContaResponse])
+def listar_contas(db: Session = Depends(get_db)):
+    return db.query(models.Conta).all()
+
+
+@app.post("/transacoes", response_model=schemas.TransacaoResponse)
+def criar_transacao(transacao: schemas.TransacaoCreate, db: Session = Depends(get_db)):
+    conta = db.query(models.Conta).filter(models.Conta.id == transacao.conta_id).first()
+    if conta is None:
+        raise HTTPException(status_code=404, detail = "Conta nao encontrada")
+
+    categoria = db.query(models.Categoria).filter(models.Categoria.id == transacao.categoria_id).first()
+    if categoria is None:
+        raise HTTPException(status_code=404, detail="Categoria nao encontrada")
+
+    nova_transacao = models.Transacao(**transacao.model_dump())
+    db.add(nova_transacao)
+    db.commit()
+    db.refresh(nova_transacao)
+    return nova_transacao
+
+
+@app.get("/transacoes", response_model=list[schemas.TransacaoResponse])
+def listar_transacoes(db: Session = Depends(get_db)):
+    return db.query(models.Transacao).all()
+

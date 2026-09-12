@@ -1,5 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional
+from decimal import Decimal
+from datetime import date
+from models import TipoTransacao
 
 
 class CategoriaBase(BaseModel):
@@ -16,4 +19,38 @@ class CategoriaResponse(CategoriaBase):
 
     class config:
         from_attributes = True
-        
+
+
+class ContaBase(BaseModel):
+    nome: str
+    saldo_inicial: Decimal = 0
+
+
+class ContaCreate(ContaBase):
+    pass
+
+
+class ContaResponse(ContaBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+class TransacaoBase(BaseModel):
+    descricao: str
+    valor: Decimal
+    tipo: TipoTransacao
+    data: date
+    conta_id: int
+    categoria_id: int
+
+
+class TransacaoCreate(TransacaoBase):
+    pass
+
+class TransacaoResponse(TransacaoBase):
+    id: int
+
+    class Config:
+        from_attributes = True
