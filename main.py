@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from database import get_db
 import models
@@ -86,4 +87,31 @@ def criar_transacao(transacao: schemas.TransacaoCreate, db: Session = Depends(ge
 @app.get("/transacoes", response_model=list[schemas.TransacaoResponse])
 def listar_transacoes(db: Session = Depends(get_db)):
     return db.query(models.Transacao).all()
+
+
+@app.post("/orcamentos", response_model=schemas.OrcamentoResponse)
+def criar_orcamento(orcamento: schemas.OrcamentoCreate, db: Session = Depends(get_db)):
+    categoria = db.query(models.Categoria).filter(models.Categoria.id == orcamento.categoria_id).first()
+    if categoria is None:
+        raise HTTPException(status_code=404, detail="Categoria nao encontrada")
+
+    novo_orcamento = models.Orcamento(**orcamento.model_dump())
+    db.add(novo_orcamento)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Ja existe um orcamento para essa categoria neste mes/ano")
+    db.refresh(novo_orcamento)
+    return novo_orcamento
+
+@app.get("/orcamentos", response_model=list[schemas.OrcamentoResponse])
+def listar_orcamentos(mes: int | None = None, ano: int | None = None, db: Session = Depends(get_db)):
+    query = db.query(models.Orcamento)
+    if mes is not None:
+        query = query.filter(models.Orcamento.mes == mes)
+    if ano is not None:
+        query = query.filter(models.Orcamento.ano == ano)
+    return query.all()
+
 

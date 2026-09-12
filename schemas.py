@@ -54,3 +54,20 @@ class TransacaoResponse(TransacaoBase):
 
     class Config:
         from_attributes = True
+
+
+class OrcamentoBase(BaseModel):
+    categoria_id: int
+    mes: int
+    ano: int
+    valor_limite: Decimal
+
+
+class OrcamentoCreate(OrcamentoBase):
+    pass
+
+class OrcamentoResponse(OrcamentoBase):
+    id: int
+
+    class Config:
+        from_attributes = True

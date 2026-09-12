@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Date, Enum
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Date, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 import enum
 from database import Base
+
 
 class Categoria(Base):
     __tablename__ = "categorias"
@@ -37,4 +38,19 @@ class Transacao(Base):
     categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=False)
 
     conta = relationship("Conta")
+    categoria = relationship("Categoria")
+
+
+class Orcamento(Base):
+    __tablename__ = "orcamentos"
+    __table_args__ = (
+        UniqueConstraint("categoria_id", "mes", "ano", name="uma_categoria_por_mes"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=False)
+    mes = Column(Integer, nullable=False)
+    ano= Column(Integer, nullable=False)
+    valor_limite = Column(Numeric(10,2), nullable=False)
+
     categoria = relationship("Categoria")
