@@ -54,3 +54,12 @@ class Orcamento(Base):
     valor_limite = Column(Numeric(10,2), nullable=False)
 
     categoria = relationship("Categoria")
+
+
+class meta(Base):
+    __tablename__ = "metas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+    valor_alvo = Column(Numeric(10,2), nullable=False)
+    valor_atual = Column(Numeric(10,2), nullable=False, default=0)

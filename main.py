@@ -115,3 +115,33 @@ def listar_orcamentos(mes: int | None = None, ano: int | None = None, db: Sessio
     return query.all()
 
 
+@app.post("/metas", response_model=schemas.MetaResponse)
+def criar_meta(meta: schemas.MetaCreate, db: Session = Depends(get_db)):
+    nova_meta = models.meta(**meta.model_dump())
+    db.add(nova_meta)
+    db.commit()
+    db.refresh(nova_meta)
+    return nova_meta
+
+@app.get("/metas", response_model=list[schemas.MetaResponse])
+def listar_metas(db: Session = Depends(get_db)):
+    return db.query(models.meta).all()
+
+
+@app.post("/metas/{meta_id}/contribuir", response_model=schemas.MetaResponse)
+def contribuir_meta(meta_id: int, contribuicao: schemas.MetaContribuicao, db: Session = Depends(get_db)):
+    meta = db.query(models.meta).filter(models.meta.id == meta_id).first()
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Meta nao encontrada")
+
+    if contribuicao.valor <= 0:
+        raise HTTPException(status_code=400, detail="O valor do aporte deve ser positivo")
+
+    meta.valor_atual += contribuicao.valor
+    db.commit()
+    db.refresh(meta)
+    return meta
+
+
+
+

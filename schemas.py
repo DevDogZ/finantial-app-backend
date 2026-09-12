@@ -71,3 +71,21 @@ class OrcamentoResponse(OrcamentoBase):
 
     class Config:
         from_attributes = True
+
+
+class MetaBase(BaseModel):
+    nome: str
+    valor_alvo: Decimal
+
+class MetaCreate(MetaBase):
+    pass 
+
+class MetaResponse(MetaBase):
+    id: int
+    valor_atual: Decimal
+
+    class Config:
+        from_attributes = True
+
+class MetaContribuicao(BaseModel):
+    valor: Decimal
