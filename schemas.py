@@ -115,4 +115,28 @@ class ContaFixaResponse(ContaFixaBase):
         from_attributes = True
 
 
+class DividaBase(BaseModel):
+    nome: str
+    valor_parcela: Decimal
+    numero_parcelas: int
+    categoria_id: int
+    conta_id: int
 
+    @field_validator("numero_parcelas")
+    @classmethod
+    def validar_parcelas(cls, v):
+        if v < 1:
+            raise ValueError("Numero de parcelas deve ser pelo menos 1")
+        return v
+
+
+class DividaCreate(DividaBase):
+    pass
+
+class DividaResponse(DividaBase):
+    id: int
+    parcelas_pagas: int
+    quitada: bool
+
+    class Config:
+        from_attributes = True

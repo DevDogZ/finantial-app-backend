@@ -196,3 +196,53 @@ def desativar_conta_fixa(conta_fixa_id: int, db: Session = Depends(get_db)):
     conta_fixa.ativa = False
     db.commit()
     return {"detail": "Conta fixa desativada"}
+
+
+@app.post("/dividas", response_model=schemas.DividaResponse)
+def criar_divida(divida: schemas.DividaCreate, db: Session = Depends(get_db)):
+    categoria = db.query(models.Categoria).filter(models.Categoria.id == divida.categoria_id).first()
+    if categoria is None:
+        raise HTTPException(status_code=404, detail="Categoria nao encontrada")
+
+    conta = db.query(models.Conta).filter(models.Conta.id == divida.conta_id).first()
+    if conta is None:
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
+
+    nova_divida = models.Divida(**divida.model_dump())
+    db.add(nova_divida)
+    db.commit()
+    db.refresh(nova_divida)
+    return nova_divida
+
+@app.get("/dividas", response_model=list[schemas.DividaResponse])
+def listar_dividas(db: Session = Depends(get_db)):
+    return db.query(models.Divida).all()
+
+@app.post("/dividas/{divida_id}/pagar-parcela", response_model=schemas.TransacaoResponse)
+def pagar_parcela_divida(divida_id: int, db: Session = Depends(get_db)):
+    from datetime import date
+
+    divida = db.query(models.Divida).filter(models.Divida.id == divida_id).first()
+    if divida is None:
+        raise HTTPException(status_code=404, detail="Divida nao encontrada")
+
+    if divida.quitada:
+        raise HTTPException(status_code=400, detail="Essa divida ja foi quitada")
+
+    nova_transacao = models.Transacao(
+        descricao = f"{divida.nome} - parcela {divida.parcelas_pagas + 1}/{divida.numero_parcelas}",
+        valor = divida.valor_parcela,
+        tipo = models.TipoTransacao.saida,
+        data = date.today(),
+        conta_id = divida.conta_id,
+        categoria_id = divida.categoria_id,
+    )
+    db.add(nova_transacao)
+
+    divida.parcelas_pagas += 1
+    if divida.parcelas_pagas >= divida.numero_parcelas:
+        divida.quitada = True
+
+    db.commit()
+    db.refresh(nova_transacao)
+    return nova_transacao

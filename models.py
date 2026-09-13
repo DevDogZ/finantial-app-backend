@@ -79,4 +79,19 @@ class ContaFixa(Base):
     categoria = relationship("Categoria")
     conta = relationship("Conta")
 
+
+class Divida(Base):
+    __tablename__ = "dividas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+    valor_parcela = Column(Numeric(10,2), nullable=False)
+    numero_parcelas = Column(Integer, nullable=False)
+    parcelas_pagas = Column(Integer, nullable=False, default=0)
+    categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=False)
+    conta_id = Column(Integer, ForeignKey("contas.id"), nullable=False)
+    quitada = Column(Boolean, nullable=False, default=False)
+
+    categoria = relationship("Categoria")
+    conta = relationship("Conta")
     
