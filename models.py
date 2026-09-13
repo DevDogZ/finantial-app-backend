@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Date, Enum, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Date, Enum, UniqueConstraint, Boolean
 from sqlalchemy.orm import relationship
 import enum
 from database import Base
@@ -56,10 +56,27 @@ class Orcamento(Base):
     categoria = relationship("Categoria")
 
 
-class meta(Base):
+class Meta(Base):
     __tablename__ = "metas"
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String, nullable=False)
     valor_alvo = Column(Numeric(10,2), nullable=False)
     valor_atual = Column(Numeric(10,2), nullable=False, default=0)
+
+class ContaFixa(Base):
+    __tablename__ = "contas_fixas"
+
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+    valor = Column(Numeric(10,2), nullable=False)
+    dia_vencimento = Column(Integer, nullable=False)
+    categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=False)
+    conta_id = Column(Integer, ForeignKey("contas.id"), nullable=False)
+    ativa = Column(Boolean, nullable=False, default=True)
+
+    categoria = relationship("Categoria")
+    conta = relationship("Conta")
+
+    

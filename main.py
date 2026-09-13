@@ -143,5 +143,56 @@ def contribuir_meta(meta_id: int, contribuicao: schemas.MetaContribuicao, db: Se
     return meta
 
 
+@app.post("/contas-fixas", response_model=schemas.ContaFixaResponse)
+def criar_conta_fixa(conta_fixa: schemas.ContaFixaCreate, db: Session = Depends(get_db)):
+    categoria = db.query(models.Categoria).filter(models.Categoria.id == conta_fixa.categoria_id).first()
+    if categoria is None:
+        raise HTTPException(status_code=404, detail="Categoria nao encontrada")
+
+    conta = db.query(models.Conta).filter(models.Conta.id == conta_fixa.conta_id).first()
+    if conta is None:
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
 
 
+    nova_conta_fixa = models.ContaFixa(**conta_fixa.model_dump())
+    db.add(nova_conta_fixa)
+    db.commit()
+    db.refresh(nova_conta_fixa)
+    return nova_conta_fixa
+
+
+@app.get("/contas-fixas", response_model=list[schemas.ContaFixaResponse])
+def listar_contas_fixas(db: Session = Depends(get_db)):
+    return db.query(models.ContaFixa).filter(models.ContaFixa.ativa == True).all()
+
+@app.post("/contas-fixas/{conta_fixa_id}/pagar", response_model=schemas.TransacaoResponse)
+def pagar_conta_fixa(conta_fixa_id: int, db: Session = Depends(get_db)):
+    from datetime import date
+
+    conta_fixa = db.query(models.ContaFixa).filter(models.ContaFixa.id == conta_fixa_id).first()
+    if conta_fixa is None:
+        raise HTTPException(status_code=404, detail="Conta fixa nao encontrada")
+
+    nova_transacao = models.Transacao(
+        descricao = conta_fixa.nome,
+        valor = conta_fixa.valor,
+        tipo = models.TipoTransacao.saida,
+        data = date.today(),
+        conta_id = conta_fixa.conta_id,
+        categoria_id = conta_fixa.categoria_id,
+    )
+    db.add(nova_transacao)
+    db.commit()
+    db.refresh(nova_transacao)
+    return nova_transacao
+
+
+@app.delete("/contas-fixas/{conta_fixa_id}")
+def desativar_conta_fixa(conta_fixa_id: int, db: Session = Depends(get_db)):
+    conta_fixa = db.query(models.ContaFixa).filter(models.ContaFixa.id == conta_fixa_id).first()
+    if conta_fixa is None:
+        raise HTTPException(status_code=404, detail="Conta fixa nao encontrada")
+
+    conta_fixa.ativa = False
+    db.commit()
+    return {"detail": "Conta fixa desativada"}

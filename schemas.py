@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from decimal import Decimal
 from datetime import date
@@ -89,3 +89,30 @@ class MetaResponse(MetaBase):
 
 class MetaContribuicao(BaseModel):
     valor: Decimal
+
+class ContaFixaBase(BaseModel):
+    nome: str
+    valor: Decimal
+    dia_vencimento: int
+    categoria_id: int
+    conta_id: int
+
+    @field_validator("dia_vencimento")
+    @classmethod
+    def validar_dia(cls, v):
+        if v < 1 or v > 31:
+            raise ValueError("dia_vencimento deve estar entre 1 e 31")
+        return v
+
+class ContaFixaCreate(ContaFixaBase):
+    pass 
+
+class ContaFixaResponse(ContaFixaBase):
+    id: int
+    ativa: bool
+
+    class Config:
+        from_attributes = True
+
+
+
