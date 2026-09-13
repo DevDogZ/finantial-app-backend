@@ -2,12 +2,22 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from utils import calcular_mes_ano_fatura, dividir_em_parcelas
+from fastapi.middleware.cors import CORSMiddleware
 
 from database import get_db
 import models
 import schemas
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 @app.get("/")
 def home():
