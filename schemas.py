@@ -140,3 +140,64 @@ class DividaResponse(DividaBase):
 
     class Config:
         from_attributes = True
+
+
+class CartaoCreditoBase(BaseModel):
+    nome: str
+    limite: Decimal
+    dia_fechamento: int
+
+    @field_validator("dia_fechamento")
+    @classmethod
+    def validar_dia(cls, v):
+        if v < 1 or v > 31:
+            raise ValueError("dia_fechamento deve estar entre 1 e 31")
+        return v
+
+class CartaoCreditoCreate(CartaoCreditoBase):
+    pass 
+
+class CartaoCreditoResponse(CartaoCreditoBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+class CompraCartaoCreate(BaseModel):
+    descricao: str
+    valor_total: Decimal
+    numero_parcelas: int
+    data_compra: date
+    cartao_id: int
+    categoria_id: int
+
+    @field_validator("numero_parcelas")
+    @classmethod
+    def validar_parcelas(cls, v):
+        if v < 1:
+            raise ValueError("numero_parcelas deve ser pelo menos 1")
+        return v
+
+class ParcelaCartaoResponse(BaseModel):
+    id: int
+    numero_parcela: int
+    valor_parcela: Decimal
+    mes_fatura: int
+    ano_fatura: int
+    paga: bool
+
+    class Config:
+        from_attributes = True
+
+class CompraCartaoResponse(BaseModel):
+    id: int
+    descricao: str
+    valor_total: Decimal
+    numero_parcelas: int
+    data_compra: date
+    cartao_id: int
+    categoria_id: int
+    parcelas: list[ParcelaCartaoResponse]
+
+    class Config:
+        from_attributes = True

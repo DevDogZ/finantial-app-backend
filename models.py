@@ -95,3 +95,39 @@ class Divida(Base):
     categoria = relationship("Categoria")
     conta = relationship("Conta")
     
+class CartaoCredito(Base):
+    __tablename__ = "cartoes_credito"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+    limite = Column(Numeric(10,2), nullable=False)
+    dia_fechamento = Column(Integer, nullable=False)
+
+class CompraCartao(Base):
+    __tablename__ = "compras_cartao"
+
+    id = Column(Integer, primary_key=True)
+    descricao = Column(String, nullable=False)
+    valor_total = Column(Numeric(10,2), nullable=False)
+    numero_parcelas = Column(Integer, nullable=False)
+    data_compra = Column(Date, nullable=False)
+    cartao_id = Column(Integer, ForeignKey("cartoes_credito.id"), nullable=False)
+    categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=False)
+
+    cartao = relationship("CartaoCredito")
+    categoria = relationship("Categoria")
+    parcelas = relationship("ParcelaCartao", back_populates="compra")
+
+
+class ParcelaCartao(Base):
+    __tablename__ = "parcelas_cartao"
+
+    id = Column(Integer, primary_key=True, index=True)
+    compra_id = Column(Integer, ForeignKey("compras_cartao.id"), nullable=False)
+    numero_parcela = Column(Integer, nullable=False)
+    valor_parcela = Column(Numeric(10,2), nullable=False)
+    mes_fatura = Column(Integer, nullable=False)
+    ano_fatura = Column(Integer, nullable=False)
+    paga = Column(Boolean, nullable=False, default=False)
+
+    compra = relationship("CompraCartao", back_populates="parcelas")

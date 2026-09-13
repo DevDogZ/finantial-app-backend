@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from utils import calcular_mes_ano_fatura, dividir_em_parcelas
 
 from database import get_db
 import models
@@ -13,10 +14,14 @@ def home():
     return {"Mensagem": "Finanças da casa no ar!"}
 
 @app.post("/categorias", response_model=schemas.CategoriaResponse)
-def criar_categoria(Categoria: schemas.CategoriaCreate, db: Session = Depends(get_db)):
-    nova_categoria = models.Categoria(**Categoria.model_dump())
+def criar_categoria(categoria: schemas.CategoriaCreate, db: Session = Depends(get_db)):
+    nova_categoria = models.Categoria(**categoria.model_dump())
     db.add(nova_categoria)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Ja existe uma categoria com esse nome")
     db.refresh(nova_categoria)
     return nova_categoria
 
@@ -246,3 +251,67 @@ def pagar_parcela_divida(divida_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(nova_transacao)
     return nova_transacao
+
+@app.post("/cartoes", response_model=schemas.CartaoCreditoResponse)
+def criar_cartao(cartao: schemas.CartaoCreditoCreate, db: Session = Depends(get_db)):
+    novo_cartao = models.CartaoCredito(**cartao.model_dump())
+    db.add(novo_cartao)
+    db.commit()
+    db.refresh(novo_cartao)
+    return novo_cartao
+
+@app.get("/cartoes", response_model = list[schemas.CartaoCreditoResponse])
+def listar_cartoes(db: Session = Depends(get_db)):
+    return db.query(models.CartaoCredito).all()
+
+@app.post("/compras-cartao", response_model=schemas.CompraCartaoResponse)
+def criar_compra_cartao(compra: schemas.CompraCartaoCreate, db: Session = Depends(get_db)):
+
+    cartao = db.query(models.CartaoCredito).filter(models.CartaoCredito.id == compra.cartao_id).first()
+    if cartao is None:
+        raise HTTPException(status_code=404, detail="Cartao nao encontrado")
+
+    categoria = db.query(models.Categoria).filter(models.Categoria.id == compra.categoria_id).first()
+    if categoria is None:
+        raise HTTPException(status_code=404, detail="Categoria nao encontrada")
+
+    nova_compra = models.CompraCartao(**compra.model_dump())
+    db.add(nova_compra)
+    db.flush()
+
+    valores = dividir_em_parcelas(compra.valor_total, compra.numero_parcelas)
+
+    for i, valor in enumerate(valores, start=1):
+        mes_fatura, ano_fatura = calcular_mes_ano_fatura(compra.data_compra, cartao.dia_fechamento, i)
+        parcela = models.ParcelaCartao(
+            compra_id = nova_compra.id,
+            numero_parcela = i,
+            valor_parcela = valor,
+            mes_fatura = mes_fatura,
+            ano_fatura = ano_fatura,
+        )
+        db.add(parcela)
+
+    db.commit()
+    db.refresh(nova_compra)
+    return nova_compra
+
+@app.get("/cartoes/{cartao_id}/fatura")
+def ver_fatura(cartao_id: int, mes: int, ano: int, db: Session = Depends(get_db)):
+    parcelas = (
+        db.query(models.ParcelaCartao)
+        .join(models.CompraCartao)
+        .filter(
+            models.CompraCartao.cartao_id == cartao_id,
+            models.ParcelaCartao.mes_fatura == mes,
+            models.ParcelaCartao.ano_fatura == ano,
+        )
+        .all()
+    )
+    total = sum(p.valor_parcela for p in parcelas)
+    return {
+        "mes": mes,
+        "ano": ano,
+        "total": total,
+        "parcelas": [schemas.ParcelaCartaoResponse.model_validate(p) for p in parcelas],
+    }
