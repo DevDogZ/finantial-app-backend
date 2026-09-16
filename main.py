@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from utils import calcular_mes_ano_fatura, dividir_em_parcelas
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func, case
 
 from database import get_db
 import models
@@ -325,3 +326,27 @@ def ver_fatura(cartao_id: int, mes: int, ano: int, db: Session = Depends(get_db)
         "total": total,
         "parcelas": [schemas.ParcelaCartaoResponse.model_validate(p) for p in parcelas],
     }
+
+
+@app.get("/contas/{conta_id}/saldo")
+def calcular_saldo(conta_id: int, db: Session = Depends(get_db)):
+    conta = db.query(models.Conta).filter(models.Conta.id == conta_id).first()
+    if conta is None:
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
+
+    resultado = (
+        db.query(
+            func.sum(
+                case(
+                    (models.Transacao.tipo == models.TipoTransacao.entrada, models.Transacao.valor),
+                    else_=-models.Transacao.valor,
+                )
+            )
+        )
+        .filter(models.Transacao.conta_id == conta_id).scalar()
+    )
+
+    total_transacoes = resultado or 0
+    saldo = conta.saldo_inicial + total_transacoes
+
+    return {"conta_id": conta_id, "saldo_inical": conta.saldo_inicial, "saldo_atual": saldo}
