@@ -141,7 +141,7 @@ def criar_meta(meta: schemas.MetaCreate, db: Session = Depends(get_db)):
 
 @app.get("/metas", response_model=list[schemas.MetaResponse])
 def listar_metas(db: Session = Depends(get_db)):
-    return db.query(models.meta).all()
+    return db.query(models.Meta).all()
 
 
 @app.post("/metas/{meta_id}/contribuir", response_model=schemas.MetaResponse)
