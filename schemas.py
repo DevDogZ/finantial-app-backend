@@ -17,7 +17,7 @@ class CategoriaCreate(CategoriaBase):
 class CategoriaResponse(CategoriaBase):
     id: int
 
-    class config:
+    class Config:
         from_attributes = True
 
 
@@ -201,3 +201,27 @@ class CompraCartaoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UsuarioCreate(BaseModel):
+    nome: str
+    email: str
+    senha: str
+
+
+class UsuarioResponse(BaseModel):
+    id: int
+    nome: str
+    email: str
+
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    user_id: Optional[int] = None
