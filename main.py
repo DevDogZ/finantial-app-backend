@@ -64,8 +64,16 @@ def deletar_categoria(categoria_id: int, db: Session = Depends(get_db)):
     categoria = db.query(models.Categoria).filter(models.Categoria.id == categoria_id).first()
     if categoria is None:
         raise HTTPException(status_code=404, detail="Categoria nao encontrada")
+
     db.delete(categoria)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Nao e possivel apagar esta categoria: ela esta sendo usada em transacoes, orcamentos ou outros registros",
+        )
     return {"detail": "Categoria deletada"}
 
 
@@ -81,6 +89,24 @@ def criar_conta(conta: schemas.ContaCreate, db: Session = Depends(get_db)):
 @app.get("/contas", response_model=list[schemas.ContaResponse])
 def listar_contas(db: Session = Depends(get_db)):
     return db.query(models.Conta).all()
+
+
+@app.delete("/contas/{conta_id}")
+def deletar_conta(conta_id: int, db: Session = Depends(get_db)):
+    conta = db.query(models.Conta).filter(models.Conta.id == conta_id).first()
+    if conta is None:
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
+
+    db.delete(conta)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Nao e possivel apagar esta conta: ela esta sendo usada em transacoes, contas fixas ou dividas",
+        )
+    return {"detail": "Conta deletada"}
 
 
 @app.post("/transacoes", response_model=schemas.TransacaoResponse)
@@ -103,6 +129,17 @@ def criar_transacao(transacao: schemas.TransacaoCreate, db: Session = Depends(ge
 @app.get("/transacoes", response_model=list[schemas.TransacaoResponse])
 def listar_transacoes(db: Session = Depends(get_db)):
     return db.query(models.Transacao).all()
+
+
+@app.delete("/transacoes/{transacao_id}")
+def deletar_transacao(transacao_id: int, db: Session = Depends(get_db)):
+    transacao = db.query(models.Transacao).filter(models.Transacao.id == transacao_id).first()
+    if transacao is None:
+        raise HTTPException(status_code=404, detail="Transacao nao encontrada")
+
+    db.delete(transacao)
+    db.commit()
+    return {"detail": "Transacao deletada"}
 
 
 @app.post("/orcamentos", response_model=schemas.OrcamentoResponse)
@@ -131,9 +168,20 @@ def listar_orcamentos(mes: int | None = None, ano: int | None = None, db: Sessio
     return query.all()
 
 
+@app.delete("/orcamentos/{orcamento_id}")
+def deletar_orcamento(orcamento_id: int, db: Session = Depends(get_db)):
+    orcamento = db.query(models.Orcamento).filter(models.Orcamento.id == orcamento_id).first()
+    if orcamento is None:
+        raise HTTPException(status_code=404, detail="Orcamento nao encontrado")
+
+    db.delete(orcamento)
+    db.commit()
+    return {"detail": "Orcamento deletado"}
+
+
 @app.post("/metas", response_model=schemas.MetaResponse)
 def criar_meta(meta: schemas.MetaCreate, db: Session = Depends(get_db)):
-    nova_meta = models.meta(**meta.model_dump())
+    nova_meta = models.Meta(**meta.model_dump())
     db.add(nova_meta)
     db.commit()
     db.refresh(nova_meta)
@@ -146,7 +194,7 @@ def listar_metas(db: Session = Depends(get_db)):
 
 @app.post("/metas/{meta_id}/contribuir", response_model=schemas.MetaResponse)
 def contribuir_meta(meta_id: int, contribuicao: schemas.MetaContribuicao, db: Session = Depends(get_db)):
-    meta = db.query(models.meta).filter(models.meta.id == meta_id).first()
+    meta = db.query(models.Meta).filter(models.Meta.id == meta_id).first()
     if meta is None:
         raise HTTPException(status_code=404, detail="Meta nao encontrada")
 
@@ -157,6 +205,17 @@ def contribuir_meta(meta_id: int, contribuicao: schemas.MetaContribuicao, db: Se
     db.commit()
     db.refresh(meta)
     return meta
+
+
+@app.delete("/metas/{meta_id}")
+def deletar_meta(meta_id: int, db: Session = Depends(get_db)):
+    meta = db.query(models.Meta).filter(models.Meta.id == meta_id).first()
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Meta nao encontrada")
+
+    db.delete(meta)
+    db.commit()
+    return {"detail": "Meta deletada"}
 
 
 @app.post("/contas-fixas", response_model=schemas.ContaFixaResponse)
@@ -234,6 +293,17 @@ def criar_divida(divida: schemas.DividaCreate, db: Session = Depends(get_db)):
 def listar_dividas(db: Session = Depends(get_db)):
     return db.query(models.Divida).all()
 
+
+@app.delete("/dividas/{divida_id}")
+def deletar_divida(divida_id: int, db: Session = Depends(get_db)):
+    divida = db.query(models.Divida).filter(models.Divida.id == divida_id).first()
+    if divida is None:
+        raise HTTPException(status_code=404, detail="Divida nao encontrada")
+
+    db.delete(divida)
+    db.commit()
+    return {"detail": "Divida deletada"}
+
 @app.post("/dividas/{divida_id}/pagar-parcela", response_model=schemas.TransacaoResponse)
 def pagar_parcela_divida(divida_id: int, db: Session = Depends(get_db)):
     from datetime import date
@@ -274,6 +344,24 @@ def criar_cartao(cartao: schemas.CartaoCreditoCreate, db: Session = Depends(get_
 @app.get("/cartoes", response_model = list[schemas.CartaoCreditoResponse])
 def listar_cartoes(db: Session = Depends(get_db)):
     return db.query(models.CartaoCredito).all()
+
+
+@app.delete("/cartoes/{cartao_id}")
+def deletar_cartao(cartao_id: int, db: Session = Depends(get_db)):
+    cartao = db.query(models.CartaoCredito).filter(models.CartaoCredito.id == cartao_id).first()
+    if cartao is None:
+        raise HTTPException(status_code=404, detail="Cartao nao encontrado")
+
+    db.delete(cartao)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Nao e possivel apagar este cartao: ele possui compras registradas",
+        )
+    return {"detail": "Cartao deletado"}
 
 @app.post("/compras-cartao", response_model=schemas.CompraCartaoResponse)
 def criar_compra_cartao(compra: schemas.CompraCartaoCreate, db: Session = Depends(get_db)):
@@ -349,4 +437,4 @@ def calcular_saldo(conta_id: int, db: Session = Depends(get_db)):
     total_transacoes = resultado or 0
     saldo = conta.saldo_inicial + total_transacoes
 
-    return {"conta_id": conta_id, "saldo_inical": conta.saldo_inicial, "saldo_atual": saldo}
+    return {"conta_id": conta_id, "saldo_inicial": conta.saldo_inicial, "saldo_atual": saldo}
