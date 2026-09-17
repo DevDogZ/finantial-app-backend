@@ -6,7 +6,15 @@ from fastapi.testclient import TestClient
 from database import Base, get_db
 from main import app
 
-TEST_DATABASE_URL = "postgresql://financas_user:financas_pass@localhost:5432/financas_db_test"
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+
+if not TEST_DATABASE_URL:
+    raise RuntimeError("TEST_DATABASE_URL não configurada")
 
 engine_teste = create_engine(TEST_DATABASE_URL)
 SessionTeste = sessionmaker(autocommit=False, autoflush=False, bind=engine_teste)
