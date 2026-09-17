@@ -74,7 +74,7 @@ def cadastrar_usuario(
 
 @app.post("/login", response_model=schemas.Token)
 def login(
-    usuario: schemas.UsuarioCreate,
+    usuario: schemas.LoginRequest,
     db: Session = Depends(get_db)
 ):
     usuario_autenticado = autenticar_usuario(

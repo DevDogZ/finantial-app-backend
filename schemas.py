@@ -225,3 +225,8 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     user_id: Optional[int] = None
+
+class LoginRequest(BaseModel):
+    email: str
+    senha: str
+
