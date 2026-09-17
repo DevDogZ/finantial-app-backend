@@ -31,7 +31,7 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from dateutil.relativedelta import relativedelta
 from jinja2 import Environment
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 from weasyprint import HTML
 
@@ -66,6 +66,15 @@ CORES_CATEGORIAS = [
 
 NOME_APP = "FinanDog"  # <- troque se o nome do app no frontend for outro
 
+MESES_PT = [
+    "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+]
+
+
+def _nome_mes_pt(mes: int, ano: int) -> str:
+    return f"{MESES_PT[mes]} de {ano}"
+
 
 # ============================================================
 # 1) AGREGAÇÃO DOS DADOS
@@ -86,31 +95,32 @@ def montar_dados_relatorio(db: Session, usuario: models.Usuario, mes: int, ano: 
         .all()
     )
 
-    entradas = sum(t.valor for t in transacoes if t.tipo == models.TipoTransacao.entrada)
-    gastos = sum(t.valor for t in transacoes if t.tipo == models.TipoTransacao.saida)
+    entradas = float(sum(t.valor for t in transacoes if t.tipo == models.TipoTransacao.entrada) or 0)
+    gastos = float(sum(t.valor for t in transacoes if t.tipo == models.TipoTransacao.saida) or 0)
     saldo = entradas - gastos
 
     # gastos por categoria
     gastos_por_categoria = {}
     for t in transacoes:
         if t.tipo == models.TipoTransacao.saida:
-            nome_cat = t.categoria.nome
-            gastos_por_categoria[nome_cat] = gastos_por_categoria.get(nome_cat, 0) + t.valor
+            nome_cat = t.categoria.nome if t.categoria else "Sem categoria"
+            gastos_por_categoria[nome_cat] = gastos_por_categoria.get(nome_cat, 0.0) + float(t.valor or 0)
 
     categorias = []
     for i, (nome_cat, valor) in enumerate(
         sorted(gastos_por_categoria.items(), key=lambda x: x[1], reverse=True)
     ):
-        pct = (valor / gastos * 100) if gastos else 0
+        valor = float(valor)
+        pct = (valor / gastos * 100) if gastos else 0.0
         categorias.append(
             {
                 "nome": nome_cat,
                 "valor": valor,
-                "pct": pct,
+                "pct": float(pct),
                 "cor": CORES_CATEGORIAS[i % len(CORES_CATEGORIAS)],
             }
         )
-
+        
     # evolução dos últimos 6 meses (entradas x gastos)
     evolucao = []
     for i in range(5, -1, -1):
@@ -120,10 +130,16 @@ def montar_dados_relatorio(db: Session, usuario: models.Usuario, mes: int, ano: 
         linha = (
             db.query(
                 func.sum(
-                    func.case((models.Transacao.tipo == models.TipoTransacao.entrada, models.Transacao.valor), else_=0)
+                    case(
+                        (models.Transacao.tipo == models.TipoTransacao.entrada, models.Transacao.valor),
+                        else_=0,
+                    )
                 ),
                 func.sum(
-                    func.case((models.Transacao.tipo == models.TipoTransacao.saida, models.Transacao.valor), else_=0)
+                    case(
+                        (models.Transacao.tipo == models.TipoTransacao.saida, models.Transacao.valor),
+                        else_=0,
+                    )
                 ),
             )
             .join(models.Conta, models.Transacao.conta_id == models.Conta.id)
@@ -136,7 +152,7 @@ def montar_dados_relatorio(db: Session, usuario: models.Usuario, mes: int, ano: 
         )
         evolucao.append(
             {
-                "label": f"{ref.strftime('%b/%y').capitalize()}",
+                "label": f"{MESES_PT[ref.month][:3]}/{str(ref.year)[2:]}",
                 "entradas": float(linha[0] or 0),
                 "gastos": float(linha[1] or 0),
             }
@@ -148,11 +164,28 @@ def montar_dados_relatorio(db: Session, usuario: models.Usuario, mes: int, ano: 
         .all()
     )
 
-    orcamentos = (
+    orcamentos_raw = (
         db.query(models.Orcamento)
         .filter(models.Orcamento.usuario_id == usuario.id, models.Orcamento.mes == mes, models.Orcamento.ano == ano)
         .all()
     )
+
+    # Calcula gasto atual por orçamento (soma de saídas da categoria no mês)
+    orcamentos = []
+    for o in orcamentos_raw:
+        gasto_atual = sum(
+            float(t.valor)
+            for t in transacoes
+            if t.tipo == models.TipoTransacao.saida
+            and t.categoria_id == o.categoria_id
+        )
+        orcamentos.append(
+            {
+                "categoria_nome": o.categoria.nome if o.categoria else "—",
+                "valor_limite": float(o.valor_limite or 0),
+                "gasto_atual": gasto_atual,
+            }
+        )
 
     dividas = (
         db.query(models.Divida)
@@ -166,7 +199,7 @@ def montar_dados_relatorio(db: Session, usuario: models.Usuario, mes: int, ano: 
         "usuario_nome": usuario.nome,
         "mes": mes,
         "ano": ano,
-        "mes_nome": primeiro_dia.strftime("%B de %Y").capitalize(),
+        "mes_nome": _nome_mes_pt(mes, ano),
         "gerado_em": date.today().strftime("%d/%m/%Y"),
         "entradas": entradas,
         "gastos": gastos,
@@ -196,9 +229,12 @@ def gerar_grafico_categorias(categorias: list) -> str:
     if not categorias:
         return ""
 
-    valores = [c["valor"] for c in categorias]
+    valores = [float(c["valor"]) for c in categorias]
+    if sum(valores) <= 0:
+        return ""
+
     cores = [c["cor"] for c in categorias]
-    labels = [f'{c["nome"]} ({c["pct"]:.0f}%)' for c in categorias]
+    labels = [f'{c["nome"]} ({float(c["pct"]):.0f}%)' for c in categorias]
 
     fig, ax = plt.subplots(figsize=(4.2, 4.2), facecolor="none")
     wedges, _ = ax.pie(
@@ -322,9 +358,8 @@ TEMPLATE_HTML = """
     .titulo-bloco h1 {
         margin: 2px 0 2px 0;
         font-size: 24px;
-        background: linear-gradient(90deg, {{ cores.neon_azul }}, {{ cores.neon_roxo }});
-        -webkit-background-clip: text;
-        color: transparent;
+        color: {{ cores.neon_azul }};
+        text-shadow: 0 0 8px {{ cores.neon_azul }}88;
     }
     .titulo-bloco .subtitulo {
         color: {{ cores.texto_fraco }};
@@ -506,10 +541,10 @@ TEMPLATE_HTML = """
         <tbody>
         {% for o in dados.orcamentos %}
             <tr>
-                <td>{{ o.categoria.nome }}</td>
-                <td>R$ {{ o.limite|moeda }}</td>
-                <td>R$ {{ o.gasto_atual|moeda if o.gasto_atual is defined else "-" }}</td>
-                <td>{{ "%.0f"|format((o.gasto_atual / o.limite * 100) if o.limite else 0) }}%</td>
+                <td>{{ o.categoria_nome }}</td>
+                <td>R$ {{ o.valor_limite|moeda }}</td>
+                <td>R$ {{ o.gasto_atual|moeda }}</td>
+                <td>{{ "%.0f"|format((o.gasto_atual / o.valor_limite * 100) if o.valor_limite else 0) }}%</td>
             </tr>
         {% endfor %}
         </tbody>
