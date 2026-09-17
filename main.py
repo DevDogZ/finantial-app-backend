@@ -1,3 +1,4 @@
+import io
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -6,6 +7,8 @@ from sqlalchemy.exc import IntegrityError
 from utils import calcular_mes_ano_fatura, dividir_em_parcelas
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, case
+from fastapi.responses import StreamingResponse
+from relatorios import montar_dados_relatorio, gerar_pdf_relatorio
 
 from database import get_db
 import models
@@ -128,6 +131,29 @@ app.add_middleware(
 @app.get("/")
 def home():
     return {"Mensagem": "Finanças da casa no ar!"}
+
+
+# ============================================================
+# RELATÓRIOS
+# ============================================================
+ 
+@app.get("/relatorios/pdf")
+def exportar_relatorio_pdf(
+    mes: int,
+    ano: int,
+    db: Session = Depends(get_db),
+    usuario: models.Usuario = Depends(obter_usuario_atual),
+):
+    dados = montar_dados_relatorio(db, usuario, mes, ano)
+    pdf_bytes = gerar_pdf_relatorio(dados)
+ 
+    nome_arquivo = f"relatorio-financas-{ano}-{mes:02d}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'},
+    )
+ 
 
 
 # ============================================================
