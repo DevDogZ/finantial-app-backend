@@ -194,6 +194,7 @@ def listar_categorias(
     return (
         db.query(models.Categoria)
         .filter(models.Categoria.usuario_id == usuario.id)
+        .order_by(models.Categoria.id.desc())
         .all()
     )
 
@@ -263,6 +264,7 @@ def listar_contas(
     return (
         db.query(models.Conta)
         .filter(models.Conta.usuario_id == usuario.id)
+        .order_by(models.Conta.id.desc())
         .all()
     )
 
@@ -370,6 +372,10 @@ def listar_transacoes(
         .filter(
             models.Conta.usuario_id == usuario.id
         )
+        .order_by(
+            models.Transacao.data.desc(),
+            models.Transacao.id.desc(),
+        )
         .all()
     )
 
@@ -476,7 +482,15 @@ def listar_orcamentos(
             models.Orcamento.ano == ano
         )
 
-    return query.all()
+    return (
+        query
+        .order_by(
+            models.Orcamento.ano.desc(),
+            models.Orcamento.mes.desc(),
+            models.Orcamento.id.desc(),
+        )
+        .all()
+    )
 
 
 @app.delete("/orcamentos/{orcamento_id}")
@@ -536,6 +550,7 @@ def listar_metas(
     return (
         db.query(models.Meta)
         .filter(models.Meta.usuario_id == usuario.id)
+        .order_by(models.Meta.id.desc())
         .all()
     )
 
@@ -675,6 +690,7 @@ def listar_contas_fixas(
             models.ContaFixa.usuario_id == usuario.id,
             models.ContaFixa.ativa == True
         )
+        .order_by(models.ContaFixa.id.desc())
         .all()
     )
 
@@ -811,6 +827,7 @@ def listar_dividas(
     return (
         db.query(models.Divida)
         .filter(models.Divida.usuario_id == usuario.id)
+        .order_by(models.Divida.id.desc())
         .all()
     )
 
@@ -934,6 +951,7 @@ def listar_cartoes(
         .filter(
             models.CartaoCredito.usuario_id == usuario.id
         )
+        .order_by(models.CartaoCredito.id.desc())
         .all()
     )
 
@@ -1049,7 +1067,27 @@ def criar_compra_cartao(
     db.refresh(nova_compra)
 
     return nova_compra
-
+@app.get(
+    "/compras-cartao",
+    response_model=list[schemas.CompraCartaoResponse]
+)
+def listar_compras_cartao(
+    db: Session = Depends(get_db),
+    usuario: models.Usuario = Depends(obter_usuario_atual)
+):
+    return (
+        db.query(models.CompraCartao)
+        .join(
+            models.CartaoCredito,
+            models.CompraCartao.cartao_id == models.CartaoCredito.id
+        )
+        .filter(models.CartaoCredito.usuario_id == usuario.id)
+        .order_by(
+            models.CompraCartao.data_compra.desc(),
+            models.CompraCartao.id.desc(),
+        )
+        .all()
+    )
 
 @app.get("/cartoes/{cartao_id}/fatura")
 def ver_fatura(
@@ -1106,9 +1144,11 @@ def ver_fatura(
 )
 def pagar_parcela_cartao(
     parcela_id: int,
+    pagamento: schemas.PagarParcelaCartao,
     db: Session = Depends(get_db),
     usuario: models.Usuario = Depends(obter_usuario_atual)
 ):
+    from datetime import date
     parcela = (
         db.query(models.ParcelaCartao)
         .join(models.CompraCartao)
@@ -1126,7 +1166,35 @@ def pagar_parcela_cartao(
             detail="Parcela nao encontrada"
         )
 
+    conta = (
+        db.query(models.Conta)
+        .filter(
+            models.Conta.id == pagamento.conta_id,
+            models.Conta.usuario_id == usuario.id
+        )
+        .first()
+    )
+
+    if conta is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Conta nao encontrada"
+        )
+
     parcela.paga = not parcela.paga
+    if parcela.paga:
+        compra = parcela.compra
+        nova_transacao = models.Transacao(
+            descricao=compra.descricao,
+            valor=parcela.valor_parcela,
+            tipo=models.TipoTransacao.saida,
+            data=date.today(),
+            conta_id=conta.id,
+            categoria_id=compra.categoria_id,
+        )
+
+        db.add(nova_transacao)
+
     db.commit()
     db.refresh(parcela)
 

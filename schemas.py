@@ -159,10 +159,13 @@ class CartaoCreditoCreate(CartaoCreditoBase):
 
 class CartaoCreditoResponse(CartaoCreditoBase):
     id: int
-
     class Config:
         from_attributes = True
-
+class CartaoCreditoResumo(BaseModel):
+    id: int
+    nome: str
+    class Config:
+        from_attributes = True
 class CompraCartaoCreate(BaseModel):
     descricao: str
     valor_total: Decimal
@@ -197,10 +200,13 @@ class CompraCartaoResponse(BaseModel):
     data_compra: date
     cartao_id: int
     categoria_id: int
+    cartao: CartaoCreditoResumo
     parcelas: list[ParcelaCartaoResponse]
 
     class Config:
         from_attributes = True
+class PagarParcelaCartao(BaseModel):
+    conta_id: int
 
 
 class UsuarioCreate(BaseModel):
