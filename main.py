@@ -198,74 +198,6 @@ def listar_categorias(
     )
 
 
-@app.get(
-    "/categorias/{categoria_id}",
-    response_model=schemas.CategoriaResponse
-)
-def buscar_categoria(
-    categoria_id: int,
-    db: Session = Depends(get_db),
-    usuario: models.Usuario = Depends(obter_usuario_atual)
-):
-    categoria = (
-        db.query(models.Categoria)
-        .filter(
-            models.Categoria.id == categoria_id,
-            models.Categoria.usuario_id == usuario.id
-        )
-        .first()
-    )
-
-    if categoria is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Categoria nao encontrada"
-        )
-
-    return categoria
-
-
-@app.put(
-    "/categorias/{categoria_id}",
-    response_model=schemas.CategoriaResponse
-)
-def atualizar_categoria(
-    categoria_id: int,
-    dados: schemas.CategoriaCreate,
-    db: Session = Depends(get_db),
-    usuario: models.Usuario = Depends(obter_usuario_atual)
-):
-    categoria = (
-        db.query(models.Categoria)
-        .filter(
-            models.Categoria.id == categoria_id,
-            models.Categoria.usuario_id == usuario.id
-        )
-        .first()
-    )
-
-    if categoria is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Categoria nao encontrada"
-        )
-
-    categoria.nome = dados.nome
-    categoria.cor = dados.cor
-
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail="Ja existe uma categoria com esse nome"
-        )
-
-    db.refresh(categoria)
-    return categoria
-
-
 @app.delete("/categorias/{categoria_id}")
 def deletar_categoria(
     categoria_id: int,
@@ -1168,7 +1100,37 @@ def ver_fatura(
         ],
     }
 
+@app.post(
+    "/parcelas-cartao/{parcela_id}/pagar",
+    response_model=schemas.ParcelaCartaoResponse
+)
+def pagar_parcela_cartao(
+    parcela_id: int,
+    db: Session = Depends(get_db),
+    usuario: models.Usuario = Depends(obter_usuario_atual)
+):
+    parcela = (
+        db.query(models.ParcelaCartao)
+        .join(models.CompraCartao)
+        .join(models.CartaoCredito)
+        .filter(
+            models.ParcelaCartao.id == parcela_id,
+            models.CartaoCredito.usuario_id == usuario.id
+        )
+        .first()
+    )
 
+    if parcela is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Parcela nao encontrada"
+        )
+
+    parcela.paga = not parcela.paga
+    db.commit()
+    db.refresh(parcela)
+
+    return parcela
 # ============================================================
 # SALDO DA CONTA
 # ============================================================
